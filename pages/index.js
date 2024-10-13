@@ -1,117 +1,158 @@
-import {useState, useEffect} from "react";
-import {ethers} from "ethers";
-import atm_abi from "../artifacts/contracts/Assessment.sol/Assessment.json";
+import { useState, useEffect } from "react";
+import { ethers } from "ethers";
+import lootbox_abi from "../artifacts/contracts/Lootbox.sol/Lootbox.json";
 
 export default function HomePage() {
   const [ethWallet, setEthWallet] = useState(undefined);
   const [account, setAccount] = useState(undefined);
-  const [atm, setATM] = useState(undefined);
-  const [balance, setBalance] = useState(undefined);
+  const [lootbox, setLootbox] = useState(undefined);
+  const [prizes, setPrizes] = useState([]);
 
   const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-  const atmABI = atm_abi.abi;
+  const lootABI = lootbox_abi.abi;
 
-  const getWallet = async() => {
+  const getWallet = async () => {
     if (window.ethereum) {
       setEthWallet(window.ethereum);
     }
 
     if (ethWallet) {
-      const account = await ethWallet.request({method: "eth_accounts"});
+      const account = await ethWallet.request({ method: "eth_accounts" });
       handleAccount(account);
     }
-  }
+  };
 
   const handleAccount = (account) => {
     if (account) {
-      console.log ("Account connected: ", account);
+      console.log("Account connected: ", account);
       setAccount(account);
-    }
-    else {
+    } else {
       console.log("No account found");
     }
-  }
-
-  const connectAccount = async() => {
-    if (!ethWallet) {
-      alert('MetaMask wallet is required to connect');
-      return;
-    }
-  
-    const accounts = await ethWallet.request({ method: 'eth_requestAccounts' });
-    handleAccount(accounts);
-    
-    // once wallet is set we can get a reference to our deployed contract
-    getATMContract();
   };
 
-  const getATMContract = () => {
+  const connectAccount = async () => {
+    if (!ethWallet) {
+      alert("MetaMask wallet is required to connect");
+      return;
+    }
+
+    const accounts = await ethWallet.request({ method: "eth_requestAccounts" });
+    handleAccount(accounts);
+
+    // once wallet is set we can get a reference to our deployed contract
+    getLootboxContract();
+  };
+
+  const getLootboxContract = () => {
     const provider = new ethers.providers.Web3Provider(ethWallet);
     const signer = provider.getSigner();
-    const atmContract = new ethers.Contract(contractAddress, atmABI, signer);
- 
-    setATM(atmContract);
-  }
+    const lootContract = new ethers.Contract(contractAddress, lootABI, signer);
 
-  const getBalance = async() => {
-    if (atm) {
-      setBalance((await atm.getBalance()).toNumber());
-    }
-  }
+    setLootbox(lootContract);
 
-  const deposit = async() => {
-    if (atm) {
-      let tx = await atm.deposit(1);
-      await tx.wait()
-      getBalance();
-    }
-  }
+    lootContract.on("LootboxBought", (buyer, boxType, prize) => {
+      alert(`You won a Prize: ${prize}`);
+    });
+    getRewards();
+  };
 
-  const withdraw = async() => {
-    if (atm) {
-      let tx = await atm.withdraw(1);
-      await tx.wait()
-      getBalance();
+  const getRewards = async () => {
+    if (lootbox) {
+      setPrizes(await lootbox.getMyPrizes());
     }
-  }
+  };
+
+  const buyWood = async () => {
+    if (!lootbox) return;
+
+    try {
+      const tx = await lootbox.buyWoodBox({
+        value: ethers.utils.parseEther("1"),
+      });
+      await tx.wait();
+    } catch (error) {
+      console.error("transaaction error", error);
+    }
+
+    getRewards();
+  };
+
+  const buySilver = async () => {
+    if (!lootbox) return;
+
+    const tx = await lootbox.buySilverBox({
+      value: ethers.utils.parseEther("2"),
+    });
+    await tx.wait();
+
+    getRewards();
+  };
 
   const initUser = () => {
     // Check to see if user has Metamask
     if (!ethWallet) {
-      return <p>Please install Metamask in order to use this ATM.</p>
+      return <p>Please install Metamask in order to use this App.</p>;
     }
 
     // Check to see if user is connected. If not, connect to their account
     if (!account) {
-      return <button onClick={connectAccount}>Please connect your Metamask wallet</button>
-    }
-
-    if (balance == undefined) {
-      getBalance();
+      return (
+        <button onClick={connectAccount}>
+          Please connect your Metamask wallet
+        </button>
+      );
     }
 
     return (
       <div>
-        <p>Your Account: {account}</p>
-        <p>Your Balance: {balance}</p>
-        <button onClick={deposit}>Deposit 1 ETH</button>
-        <button onClick={withdraw}>Withdraw 1 ETH</button>
+        <p>Your Account: {`...${account.toString().slice(-4)}`}</p>
+        {account ? (
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              justifyContent: "center",
+            }}
+          >
+            <button onClick={buyWood}>Buy Wood Loot</button>
+            <button onClick={buySilver}> Buy Silver Loot</button>
+          </div>
+        ) : (
+          <p>Please Connect Account.</p>
+        )}
+        <hr />
+        <h2> Your Prizes </h2>
+        <ul>
+          {prizes.map((prize, index) => (
+            <li key={index}>{prize}</li>
+          ))}
+        </ul>
       </div>
-    )
-  }
+    );
+  };
 
-  useEffect(() => {getWallet();}, []);
+  useEffect(() => {
+    getWallet();
+  }, []);
 
   return (
     <main className="container">
-      <header><h1>Welcome to the Metacrafters ATM!</h1></header>
+      <header>
+        <h1>Welcome to Meta Gacha!</h1>
+      </header>
       {initUser()}
-      <style jsx>{`
-        .container {
-          text-align: center
-        }
-      `}
+      <style jsx>
+        {`
+          .container {
+            text-align: center;
+            font-family: Arial;
+          }
+          body {
+            font-family: Arial;
+          }
+        `}
       </style>
     </main>
-  )
+  );
 }
