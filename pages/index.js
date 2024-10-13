@@ -11,6 +11,7 @@ export default function HomePage() {
   const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const lootABI = lootbox_abi.abi;
 
+  // connect with metamask wallet and get account
   const getWallet = async () => {
     if (window.ethereum) {
       setEthWallet(window.ethereum);
@@ -41,20 +42,15 @@ export default function HomePage() {
     handleAccount(accounts);
 
     // once wallet is set we can get a reference to our deployed contract
-    getLootboxContract();
+    await getLootboxContract();
   };
 
-  const getLootboxContract = () => {
+  const getLootboxContract = async () => {
     const provider = new ethers.providers.Web3Provider(ethWallet);
     const signer = provider.getSigner();
     const lootContract = new ethers.Contract(contractAddress, lootABI, signer);
 
     setLootbox(lootContract);
-
-    lootContract.on("LootboxBought", (buyer, boxType, prize) => {
-      alert(`You won a Prize: ${prize}`);
-    });
-    getRewards();
   };
 
   const getRewards = async () => {
@@ -134,7 +130,12 @@ export default function HomePage() {
 
   useEffect(() => {
     getWallet();
+    
   }, []);
+
+  useEffect(() => {
+    getRewards();
+  }, [lootbox])
 
   return (
     <main className="container">
